@@ -41,14 +41,17 @@ Cobra is a CLI library for Go that empowers applications.
 This application is a tool to generate the needed files
 to quickly create a Cobra application.`,
 	Run: func(cmd *cobra.Command, args []string) {
-		log.Printf("getting info from %s@%s:%v\n", user1, host1, port1)
+
+		hostPort := fmt.Sprintf("%s:%v", host1, port1)
+
+		log.Printf("getting info from %s@%v\n", user1, hostPort)
 
 		switch {
 		case ssl1:
 			fmt.Println("ciao")
 		default:
 			// Connect to server
-			c, err := client.Dial(fmt.Sprintf("%v:%v", host1, port1))
+			c, err := client.Dial(hostPort)
 			if err != nil {
 				log.Print("error connecting")
 				log.Fatal(err)
@@ -58,16 +61,20 @@ to quickly create a Cobra application.`,
 			// Don't forget to logout
 			defer c.Logout()
 
-			capabilities, err := c.Capability()
+			have_tls, err := c.SupportStartTLS()
 
-			startTLS, ok := capabilities["STARTTLS"]
-
-			if ok {
-				log.Println("TLS present", startTLS)
-			} else {
-				log.Println("TLS not present")
+			switch {
+			case have_tls != true && tls1:
+				log.Fatal("source host does not support enforced TLS")
+			case have_tls:
+				c, err = client.DialTLS(hostPort, nil)
+				if err != nil {
+					log.Print("error connecting")
+					log.Fatal(err)
+				}
 			}
 
+			capabilities, err := c.Capability()
 			log.Println(capabilities)
 		}
 
