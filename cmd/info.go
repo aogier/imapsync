@@ -15,10 +15,15 @@
 package cmd
 
 import (
+	//	"crypto/tls"
 	"fmt"
-	"github.com/emersion/go-imap/client"
+	"github.com/aogier/imapsync/common"
+	"github.com/emersion/go-imap"
+	//	"github.com/emersion/go-imap/client"
 	"github.com/spf13/cobra"
 	"log"
+	"sync"
+	"time"
 )
 
 type MailboxInfo struct {
@@ -29,6 +34,8 @@ type FolderInfo struct {
 	Name        string
 	Size, Count int
 }
+
+var wg sync.WaitGroup
 
 // infoCmd represents the info command
 var infoCmd = &cobra.Command{
@@ -44,39 +51,65 @@ to quickly create a Cobra application.`,
 
 		hostPort := fmt.Sprintf("%s:%v", host1, port1)
 
-		log.Printf("getting info from %s@%v\n", user1, hostPort)
+		log.Printf("Getting info from %s@%v\n", user1, hostPort)
 
-		switch {
-		case ssl1:
-			fmt.Println("ciao")
-		default:
-			// Connect to server
-			c, err := client.Dial(hostPort)
-			if err != nil {
-				log.Print("error connecting")
-				log.Fatal(err)
-			}
-			log.Println("Connected")
+		connInfo := common.ConnectInfo{
+			Tls: tls1, Ssl: ssl1,
+			Host: host1, Port: port1,
+			User: user1, Pass: pass1,
+		}
 
-			// Don't forget to logout
-			defer c.Logout()
+		c, err := common.Connection(&connInfo)
+		if err != nil {
+			log.Print("Error connecting")
+			log.Fatal(err)
+		}
+		defer c.Logout()
 
-			have_tls, err := c.SupportStartTLS()
+		// List mailboxes
+		mailboxes := make(chan *imap.MailboxInfo, 10)
+		done := make(chan error, 1)
+		go func() {
+			done <- c.List("", "*", mailboxes)
+		}()
 
-			switch {
-			case have_tls != true && tls1:
-				log.Fatal("source host does not support enforced TLS")
-			case have_tls:
-				c, err = client.DialTLS(hostPort, nil)
+		if err := <-done; err != nil {
+			log.Fatal(err)
+		}
+
+		for w := 1; w <= pool1; w++ {
+			wg.Add(1)
+			go func(
+				id int,
+				connInfo *common.ConnectInfo,
+				mailboxes <-chan *imap.MailboxInfo) {
+
+				defer wg.Done()
+				c, err := common.Connection(connInfo)
 				if err != nil {
-					log.Print("error connecting")
+					log.Print("Error connecting")
 					log.Fatal(err)
 				}
-			}
+				defer c.Logout()
 
-			capabilities, err := c.Capability()
-			log.Println(capabilities)
+				for m := range mailboxes {
+					log.Printf("[worker %v]: %s", id, m)
+
+					time.Sleep(1 * time.Second)
+
+					mbox, err := c.Select(m.Name, false)
+					if err != nil {
+						log.Println("CANE")
+						log.Fatal(err)
+					}
+
+					log.Println("Flags for %v: %s", m.Name, mbox.Flags)
+
+				}
+			}(w, &connInfo, mailboxes)
 		}
+
+		wg.Wait()
 
 	},
 }
