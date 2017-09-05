@@ -27,6 +27,7 @@ import (
 var cfgFile, host1, user1, pass1 string
 var port1, pool1 int
 var tls1, ssl1 bool
+var folders, foldersRec []string
 
 // RootCmd represents the base command when called without any subcommands
 var RootCmd = &cobra.Command{
@@ -98,6 +99,11 @@ func init() {
 
 	RootCmd.PersistentFlags().IntVar(&pool1, "pool1", runtime.NumCPU(),
 		"Size of connection pool against host1")
+
+	RootCmd.PersistentFlags().StringArrayVar(&folders, "folder", nil,
+		"Sync this folder. Can be specified multiple times")
+	RootCmd.PersistentFlags().StringArrayVar(&foldersRec, "folder-rec", nil,
+		"Sync this folder recursively. Can be specified multiple times")
 
 }
 
