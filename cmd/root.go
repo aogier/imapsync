@@ -21,10 +21,11 @@ import (
 	"github.com/spf13/viper"
 	"log"
 	"os"
+	"runtime"
 )
 
-var cfgFile, host1, user1 string
-var port1 int
+var cfgFile, host1, user1, pass1 string
+var port1, pool1 int
 var tls1, ssl1 bool
 
 // RootCmd represents the base command when called without any subcommands
@@ -49,8 +50,11 @@ to quickly create a Cobra application.`,
 			log.Fatal("Must provide user1, exiting ...")
 		}
 
+		if ssl1 && tls1 {
+			log.Fatal("ssl1 and tls1 are mutually exclusive")
+		}
+
 		if ssl1 {
-			tls1 = false
 			port1 = 993
 		}
 
@@ -78,12 +82,22 @@ func init() {
 	// when this action is called directly.
 	RootCmd.Flags().BoolP("toggle", "t", false, "Help message for toggle")
 
-	RootCmd.PersistentFlags().StringVar(&host1, "host1", "", "Source IMAP server")
-	RootCmd.PersistentFlags().IntVar(&port1, "port1", 143, "Port to connect on host1. Default 143, 993 if --ssl1")
-	RootCmd.PersistentFlags().StringVar(&user1, "user1", "", "Username on host1")
+	RootCmd.PersistentFlags().StringVar(&host1, "host1", "",
+		"Source IMAP server")
+	RootCmd.PersistentFlags().IntVar(&port1, "port1", 143,
+		"Port to connect on host1. Default 143, 993 if --ssl1")
+	RootCmd.PersistentFlags().StringVar(&user1, "user1", "",
+		"Username on host1")
+	RootCmd.PersistentFlags().StringVar(&pass1, "pass1", "",
+		"Password on host1")
 
-	RootCmd.PersistentFlags().BoolVar(&tls1, "tls1", true, "Use a TLS connection on host1")
-	RootCmd.PersistentFlags().BoolVar(&ssl1, "ssl1", false, "Use a SSL connection on host1")
+	RootCmd.PersistentFlags().BoolVar(&tls1, "tls1", false,
+		"Force TLS connection on host1")
+	RootCmd.PersistentFlags().BoolVar(&ssl1, "ssl1", false,
+		"Force SSL connection on host1")
+
+	RootCmd.PersistentFlags().IntVar(&pool1, "pool1", runtime.NumCPU(),
+		"Size of connection pool against host1")
 
 }
 
