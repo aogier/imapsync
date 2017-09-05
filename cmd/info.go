@@ -23,7 +23,7 @@ import (
 	"github.com/spf13/cobra"
 	"log"
 	"sync"
-	"time"
+	//	"time"
 )
 
 type MailboxInfo struct {
@@ -69,13 +69,29 @@ to quickly create a Cobra application.`,
 		// List mailboxes
 		mailboxes := make(chan *imap.MailboxInfo, 10)
 		done := make(chan error, 1)
+
+		//XXX: does not work because (I can't understand) library design :P
 		go func() {
-			done <- c.List("", "*", mailboxes)
+			if folders != nil {
+				for _, folder := range folders {
+					done <- c.List("", folder, mailboxes)
+				}
+			}
+			if foldersRec != nil {
+				for _, folderRec := range foldersRec {
+					done <- c.List("", fmt.Sprintf("%v*", folderRec), mailboxes)
+				}
+			}
+
+			if folders == nil && foldersRec == nil {
+				done <- c.List("", "*", mailboxes)
+			}
+
 		}()
 
-		if err := <-done; err != nil {
-			log.Fatal(err)
-		}
+		//		if err := <-done; err != nil {
+		//			log.Fatal(err)
+		//		}
 
 		for w := 1; w <= pool1; w++ {
 			wg.Add(1)
@@ -95,7 +111,7 @@ to quickly create a Cobra application.`,
 				for m := range mailboxes {
 					log.Printf("[worker %v]: %s", id, m)
 
-					time.Sleep(1 * time.Second)
+					//					time.Sleep(1 * time.Second)
 
 					mbox, err := c.Select(m.Name, false)
 					if err != nil {
@@ -103,7 +119,37 @@ to quickly create a Cobra application.`,
 						log.Fatal(err)
 					}
 
-					log.Println("Flags for %v: %s", m.Name, mbox.Flags)
+					log.Printf("Flags for %v: %v\n", m.Name, mbox.Flags)
+
+					//////////////////////
+
+					// Get the last 4 messages
+					//					from := uint32(1)
+					//					to := mbox.Messages
+
+					log.Printf("messages: %v\n", mbox.Messages)
+
+					//					if mbox.Messages > 3 {
+					//						// We're using unsigned integers here, only substract if the result is > 0
+					//						from = mbox.Messages - 3
+					//					}
+					//					seqset := new(imap.SeqSet)
+					//					seqset.AddRange(from, to)
+					//
+					//					messages := make(chan *imap.Message, 10)
+					//					done = make(chan error, 1)
+					//					go func() {
+					//						done <- c.Fetch(seqset, []string{imap.EnvelopeMsgAttr}, messages)
+					//					}()
+					//
+					//					log.Println("Last 4 messages:")
+					//					for msg := range messages {
+					//						log.Println("* " + msg.Envelope.Subject)
+					//					}
+					//
+					//					if err := <-done; err != nil {
+					//						log.Fatal(err)
+					//					}
 
 				}
 			}(w, &connInfo, mailboxes)
